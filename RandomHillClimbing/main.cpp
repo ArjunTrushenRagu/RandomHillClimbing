@@ -1,14 +1,6 @@
-//
-//  main.cpp
-//  RandomHillClimbing
-//
-//  Created by Arjun Trushen Ragu on 9/28/23.
-//
-
 #include <iostream>
 #include <vector>
-#include <cstdlib>
-#include <algorithm>
+#include <random>
 #include <tuple>
 
 using namespace std;
@@ -18,57 +10,78 @@ double f(double x, double y) {
     return pow(1.5 + x + x*y, 2) + pow(2.25 + x - x*y*y, 2) + pow(2.625 + x - x*y*y*y, 2);
 }
 
+// Generates a random number between min and max
+double generateRandom(double min, double max, mt19937 &gen) {
+    uniform_real_distribution<double> dist(min, max);
+    return dist(gen);
+}
+
 // Generates a list of neighboring points around a given point (x, y)
-vector<pair<double, double>> generateNeighbors(double x, double y, int p, double z) {
+vector<pair<double, double>> generateNeighbors(double x, double y, int p, double z, mt19937 &gen) {
     vector<pair<double, double>> neighbors;
-    for(int i = 0; i < p; i++)
-    {
-        double dx = (rand() / (double)RAND_MAX * 2 - 1) * z;
-        double dy = (rand() / (double)RAND_MAX * 2 - 1) * z;
+    for(int i = 0; i < p; i++) {
+        double dx = generateRandom(-z, z, gen);
+        double dy = generateRandom(-z, z, gen);
         neighbors.push_back({x + dx, y + dy});
     }
     return neighbors;
 }
+
 // Randomized Hill Climbing Function
 tuple<pair<double, double>, double, int> RHC(pair<double, double> sp, int p, double z, int seed) {
-    srand(seed);
-    // start with a given starting point 'sp' which is a pair (x, y)
+    mt19937 gen(seed);
     double x = sp.first;
     double y = sp.second;
-    // Amount of neighbors generated
-    int solutionsGenerated = 0;
-    
-    // Loop is repeated 'p' times
-    for(int i = 0; i < p; i++)
-    {
-        // Generate 'p' neighbors around the current point (x, y) using the 'generateNeighbors' function
-        auto neighbors = generateNeighbors(x, y, p, z);
-        solutionsGenerated += neighbors.size();
-        
-        // Calculate the function value for the current point and all its neighbors then select highest value to move to making that the new current point and continue the search from there for the next iteration
-        double currentValue = f(x, y);
-        double maxValue = currentValue;
-        pair<double, double> bestNeighbor = {x, y};
-        
-        for(const auto& neighbor : neighbors) {
-            double neighborValue = f(neighbor.first, neighbor.second);
-            if(neighborValue > maxValue) {
-                maxValue = neighborValue;
-                bestNeighbor = neighbor;
+    int num_solutions_generated = 0;
+
+    while (true) {
+        auto neighbors = generateNeighbors(x, y, p, z, gen);
+        num_solutions_generated += neighbors.size();
+
+        double best_value = f(x, y);
+        pair<double, double> best_neighbor = {x, y};
+
+        for (const auto& neighbor : neighbors) {
+            if (neighbor.first >= -4.2 && neighbor.first <= 4.2 && neighbor.second >= -4.2 && neighbor.second <= 4.2) {
+                double neighbor_value = f(neighbor.first, neighbor.second);
+                if (neighbor_value > best_value) {
+                    best_value = neighbor_value;
+                    best_neighbor = neighbor;
+                }
             }
         }
-        // update current position
-        x = bestNeighbor.first;
-        y = bestNeighbor.second;
+
+        if (best_value <= f(x, y)) {
+            break;
+        }
+
+        x = best_neighbor.first;
+        y = best_neighbor.second;
     }
-    return {{x, y}, f(x, y), solutionsGenerated};
+
+    return {{x, y}, f(x, y), num_solutions_generated};
 }
+
 int main() {
-    // Example run
-    auto [bestSolution, bestValue, totalSolutions] = RHC({-2, -3}, 65, 0.2, 43);
-    std::cout << "Best solution: (" << bestSolution.first << ", " << bestSolution.second << ")\n";
-    std::cout << "Best value: " << bestValue << "\n";
-    std::cout << "Total solutions generated: " << totalSolutions << "\n";
+    vector<pair<double, double>> starting_points = {{2,2}, {1, 4}, {-2,-3}, {1,-2}};
+    vector<int> p_values = {65, 400};
+    vector<double> z_values = {0.2, 0.01};
+    vector<int> seeds = {42, 43};
+
+    for (const auto& sp : starting_points) {
+        for (int p : p_values) {
+            for (double z : z_values) {
+                for (int seed : seeds) {
+                    auto [best_solution, best_value, num_solutions_generated] = RHC(sp, p, z, seed);
+                    cout << "Starting Point: (" << sp.first << ", " << sp.second << "), p: " << p << ", z: " << z << ", seed: " << seed << "\n";
+                    cout << "Best solution: (" << best_solution.first << ", " << best_solution.second << ")\n";
+                    cout << "Best value: " << best_value << "\n";
+                    cout << "Number of solutions generated: " << num_solutions_generated << "\n\n";
+                }
+            }
+        }
+    }
 
     return 0;
 }
+
